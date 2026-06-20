@@ -1,7 +1,7 @@
 package contracts
 
 type ErrorEvent struct {
-	ProjectKey int         `json:"project_id" validate:"required min=1"`
+	ProjectId  int         `json:"project_id" validate:"required min=1"`
 	Type       string      `json:"type" validate:"required"`
 	Level      string      `json:"level" validate:"required oneof=fatal error warn info debug trace"`
 	Message    string      `json:"message" validate:"required max=255"`
