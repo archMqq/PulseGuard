@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"errors"
-	"pulseguard/services/ingestion/cache"
+	"pulseguard/services/ingestion/internal/cache"
 	"pulseguard/services/pkg/contracts"
 
 	"github.com/go-playground/validator/v10"
