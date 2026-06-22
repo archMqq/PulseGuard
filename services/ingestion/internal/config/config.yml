@@ -1,0 +1,11 @@
+addr: "localhost:8080"
+
+kafka:
+  addr: ["localhost:6490", "localhost:6491"]
+  topic: "error-events-topic"
+
+redis:
+  addr: "localhost:2447"
+  pass: "pass"
+  db: 0
+  pool_size: 10
