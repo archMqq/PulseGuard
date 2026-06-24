@@ -1,15 +1,13 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
-	"log"
+	"errors"
 	"net/http"
+	"pulseguard/services/ingestion/internal/cache"
 	"pulseguard/services/ingestion/internal/queue"
 	"pulseguard/services/ingestion/internal/service"
 	"pulseguard/services/pkg/contracts"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,16 +16,14 @@ type HttpHandler struct {
 	injectionService service.InjectionService
 	queue            queue.QueueSaver
 	router           *gin.Engine
-	wg               *sync.WaitGroup
 }
 
-func NewHttpHandler(injectService service.InjectionService, queue queue.QueueSaver, wg *sync.WaitGroup) *HttpHandler {
+func NewHttpHandler(injectService service.InjectionService, queue queue.QueueSaver) *HttpHandler {
 	newRouter := gin.New()
 	handler := &HttpHandler{
 		injectionService: injectService,
 		queue:            queue,
 		router:           newRouter,
-		wg:               wg,
 	}
 
 	newRouter.POST("/error", handler.postError)
@@ -53,10 +49,18 @@ func (hh *HttpHandler) postError(c *gin.Context) {
 	}
 
 	if err := hh.injectionService.ValidateErrorEvent(c.Request.Context(), &event, pk); err != nil {
-		c.IndentedJSON(http.StatusUnauthorized, gin.H{
-			"message": "project unauthorized",
-		})
-		return
+
+		if errors.Is(err, cache.ErrUndefinedKey) {
+			c.IndentedJSON(http.StatusUnauthorized, gin.H{
+				"message": "project unauthorized",
+			})
+			return
+		} else if errors.Is(err, cache.ErrRedis) {
+			c.IndentedJSON(http.StatusInternalServerError, gin.H{
+				"message": "error project key checking",
+			})
+			return
+		}
 	}
 
 	eventJson, err := json.Marshal(event)
@@ -67,17 +71,12 @@ func (hh *HttpHandler) postError(c *gin.Context) {
 		return
 	}
 
-	hh.wg.Add(1)
-	go func(event string) {
-		defer hh.wg.Done()
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := hh.queue.Save(ctx, event); err != nil {
-			log.Printf("error sanding to kafka")
-		}
-	}(string(eventJson))
+	if err := hh.queue.Save(c.Request.Context(), eventJson); err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{
+			"message": "error event saving",
+		})
+		return
+	}
 
 	c.IndentedJSON(http.StatusAccepted, gin.H{})
 }

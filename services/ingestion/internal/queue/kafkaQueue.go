@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"pulseguard/services/ingestion/internal/config"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -14,9 +15,11 @@ type KafkaQueue struct {
 
 func NewKafkaQueue(cfg config.KafkaConfig) *KafkaQueue {
 	writer := &kafka.Writer{
-		Addr:     kafka.TCP(cfg.Addr...),
-		Topic:    cfg.Topic,
-		Balancer: &kafka.LeastBytes{},
+		Addr:         kafka.TCP(cfg.Addr...),
+		Topic:        cfg.Topic,
+		Balancer:     &kafka.LeastBytes{},
+		BatchSize:    cfg.BatchSize,
+		BatchTimeout: time.Duration(cfg.BatchTimeout) * time.Millisecond,
 	}
 
 	return &KafkaQueue{
@@ -24,9 +27,9 @@ func NewKafkaQueue(cfg config.KafkaConfig) *KafkaQueue {
 	}
 }
 
-func (kq KafkaQueue) Save(ctx context.Context, msg string) error {
+func (kq KafkaQueue) Save(ctx context.Context, msg []byte) error {
 	message := kafka.Message{
-		Value: []byte(msg),
+		Value: msg,
 	}
 
 	switch err := kq.writer.WriteMessages(ctx, message).(type) {
@@ -43,4 +46,8 @@ func (kq KafkaQueue) Save(ctx context.Context, msg string) error {
 		return fmt.Errorf("unknown error")
 	}
 
+}
+
+func (kq KafkaQueue) Close() error {
+	return kq.writer.Close()
 }

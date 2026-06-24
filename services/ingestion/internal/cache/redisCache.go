@@ -13,6 +13,7 @@ var (
 	ErrConnectionCancel        = errors.New("obtained client canceled connection")
 	ErrUndefinedKey            = errors.New("obtained key is undefined")
 	ErrUnknownTypeOfProjectKey = errors.New("redis contains unknown type of project key")
+	ErrRedis                   = errors.New("error from redis")
 )
 
 type RedisProjectCache struct {
@@ -40,7 +41,12 @@ func NewRedisProjectCache(ctx context.Context, cfg config.RedisConfig) (*RedisPr
 func (rc RedisProjectCache) CheckKey(ctx context.Context, key string) (int, error) {
 	sv, err := rc.redis.Get(ctx, key).Result()
 	if err != nil {
-		return 0, ErrUndefinedKey
+		switch err {
+		case redis.Nil:
+			return 0, ErrUndefinedKey
+		default:
+			return 0, ErrRedis
+		}
 	}
 
 	iv, err := strconv.Atoi(sv)
@@ -49,4 +55,8 @@ func (rc RedisProjectCache) CheckKey(ctx context.Context, key string) (int, erro
 	}
 
 	return iv, nil
+}
+
+func (rc RedisProjectCache) Close() error {
+	return rc.redis.Close()
 }

@@ -20,8 +20,10 @@ type RedisConfig struct {
 }
 
 type KafkaConfig struct {
-	Addr  []string `mapstructure:"addr"`
-	Topic string   `mapstructure:"topic"`
+	Addr         []string `mapstructure:"addr"`
+	Topic        string   `mapstructure:"topic"`
+	BatchSize    int      `mapstructure:"batch_size"`
+	BatchTimeout int      `mapstructure:"batch_timeout"`
 }
 
 func ReadConfig(path string, typ string) (*Config, error) {
