@@ -39,7 +39,6 @@ func (er ErrorInjectionService) ValidateErrorEvent(ctx context.Context, event *c
 func (er *ErrorInjectionService) validateProjectKey(ctx context.Context, key string) (int, error) {
 	id, err := er.pc.CheckKey(ctx, key)
 	if err != nil {
-		// TODO logger
 		return 0, err
 	}
 

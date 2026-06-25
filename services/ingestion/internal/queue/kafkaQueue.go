@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"pulseguard/services/ingestion/internal/config"
+	"pulseguard/services/pkg/logger"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -13,7 +14,7 @@ type KafkaQueue struct {
 	writer *kafka.Writer
 }
 
-func NewKafkaQueue(cfg config.KafkaConfig) *KafkaQueue {
+func NewKafkaQueue(cfg config.KafkaConfig, log logger.Logger) *KafkaQueue {
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(cfg.Addr...),
 		Topic:        cfg.Topic,
@@ -21,6 +22,8 @@ func NewKafkaQueue(cfg config.KafkaConfig) *KafkaQueue {
 		BatchSize:    cfg.BatchSize,
 		BatchTimeout: time.Duration(cfg.BatchTimeout) * time.Millisecond,
 	}
+
+	writer.ErrorLogger = kafka.LoggerFunc(log.Error)
 
 	return &KafkaQueue{
 		writer: writer,

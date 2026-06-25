@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"pulseguard/services/ingestion/internal/config"
+	"pulseguard/services/pkg/logger"
 	"strconv"
 
 	"github.com/redis/go-redis/v9"
@@ -18,9 +19,10 @@ var (
 
 type RedisProjectCache struct {
 	redis *redis.Client
+	log   logger.Logger
 }
 
-func NewRedisProjectCache(ctx context.Context, cfg config.RedisConfig) (*RedisProjectCache, error) {
+func NewRedisProjectCache(ctx context.Context, cfg config.RedisConfig, log logger.Logger) (*RedisProjectCache, error) {
 	redis := redis.NewClient(&redis.Options{
 		Addr:     cfg.Addr,
 		Password: cfg.Pass,
@@ -35,6 +37,7 @@ func NewRedisProjectCache(ctx context.Context, cfg config.RedisConfig) (*RedisPr
 
 	return &RedisProjectCache{
 		redis: redis,
+		log:   log,
 	}, nil
 }
 
@@ -45,12 +48,14 @@ func (rc RedisProjectCache) CheckKey(ctx context.Context, key string) (int, erro
 		case redis.Nil:
 			return 0, ErrUndefinedKey
 		default:
+			rc.log.Error(ErrRedis.Error(), err)
 			return 0, ErrRedis
 		}
 	}
 
 	iv, err := strconv.Atoi(sv)
 	if err != nil {
+		rc.log.Warn(ErrUnknownTypeOfProjectKey.Error(), err)
 		return 0, ErrUnknownTypeOfProjectKey
 	}
 

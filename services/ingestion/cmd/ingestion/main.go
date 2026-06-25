@@ -13,6 +13,8 @@ import (
 	"pulseguard/services/ingestion/internal/http"
 	"pulseguard/services/ingestion/internal/queue"
 	"pulseguard/services/ingestion/internal/service"
+	"pulseguard/services/pkg/logger"
+	"reflect"
 	"syscall"
 	"time"
 )
@@ -23,13 +25,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	redis, err := cache.NewRedisProjectCache(context.Background(), cfg.Redis)
+	logger, err := logger.NewProductionLogger()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	redis, err := cache.NewRedisProjectCache(context.Background(), cfg.Redis, logger)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	injectService := service.NewErrInjectionService(redis)
-	kafka := queue.NewKafkaQueue(cfg.Kafka)
+	kafka := queue.NewKafkaQueue(cfg.Kafka, logger)
 
 	handler := http.NewHttpHandler(&injectService, kafka)
 	server := &nethttp.Server{
@@ -39,7 +46,7 @@ func main() {
 
 	shutdownChan := make(chan struct{})
 
-	go shutdown(server, shutdownChan, kafka, redis)
+	go shutdown(server, logger, shutdownChan, kafka, redis)
 
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, nethttp.ErrServerClosed) {
 		log.Fatalf("server error: %v: ", err)
@@ -48,7 +55,7 @@ func main() {
 	<-shutdownChan
 }
 
-func shutdown(server *nethttp.Server, shutdownChan chan struct{}, closers ...io.Closer) {
+func shutdown(server *nethttp.Server, log logger.Logger, shutdownChan chan struct{}, closers ...io.Closer) {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, os.Interrupt, syscall.SIGTERM)
 	<-sigchan
@@ -57,12 +64,17 @@ func shutdown(server *nethttp.Server, shutdownChan chan struct{}, closers ...io.
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("server shutdown error: %v", err)
+		log.Error("server shutdown error", err)
 	}
 
 	for _, closer := range closers {
 		if err := closer.Close(); err != nil {
-			log.Printf("server shutdown error: %v", err)
+			t := reflect.TypeOf(closer)
+			if t.Kind() == reflect.Ptr {
+				t = t.Elem()
+			}
+
+			log.Error("error process close", err, t.Name())
 		}
 	}
 
