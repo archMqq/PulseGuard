@@ -21,7 +21,7 @@ type KafkaConsumer struct {
 	log         logger.Logger
 }
 
-func NewKafka(kc config.KafkaConfig, logger logger.Logger) Consumer {
+func NewKafka(kc config.KafkaConfig, logger logger.Logger) *KafkaConsumer {
 	consumer := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  kc.Brokers,
 		GroupID:  kc.GroupId,

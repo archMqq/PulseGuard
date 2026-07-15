@@ -3,10 +3,12 @@ package models
 import (
 	"pulseguard/services/pkg/contracts"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type ErrorIssue struct {
-	Id          uuid
+	Id          uuid.UUID
 	ProjectId   int
 	Fingerprint uint64
 	Title       string
