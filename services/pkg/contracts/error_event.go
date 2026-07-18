@@ -6,7 +6,7 @@ type ErrorEvent struct {
 	Level      string      `json:"level" validate:"required oneof=fatal error warn info debug trace"`
 	Message    string      `json:"message" validate:"required max=255"`
 	Timestamp  int64       `json:"timestamp" validate:"required"`
-	StackTrace []TraceElem `json:"stack_trace" validate:"required min=1"`
+	StackTrace []TraceElem `json:"stack_trace" validate:"required"`
 }
 
 type TraceElem struct {
