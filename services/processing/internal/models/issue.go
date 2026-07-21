@@ -17,8 +17,8 @@ type ErrorIssue struct {
 	CreatedAt   time.Time
 }
 
-func ParseErrorIssue(ee contracts.ErrorEvent, fp uint64) *ErrorIssue {
-	return &ErrorIssue{
+func ParseErrorIssue(ee contracts.ErrorEvent, fp uint64) ErrorIssue {
+	return ErrorIssue{
 		ProjectId:   ee.ProjectId,
 		Fingerprint: fp,
 		Title:       ee.Type,
