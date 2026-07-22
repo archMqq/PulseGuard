@@ -7,7 +7,7 @@ import (
 )
 
 type Cache interface {
-	CheckEvent(context.Context, uint64) (uuid.UUID, error)
-	SaveTemp(context.Context) error
-	SaveNew(context.Context, uint64) error
+	CheckIssues(context.Context, []uint64) (map[uint64]uuid.UUID, []uint64, error)
+	SaveTemp(context.Context, []uint64) ([]uint64, []uint64, error)
+	SaveNew(context.Context, map[uint64]uuid.UUID) error
 }
