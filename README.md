@@ -11,8 +11,6 @@ PulseGuard — это высоконагруженный асинхронный 
 - Брокер сообщений: Kafka (segmentio/kafka-go)
 - Кэш / In-memory БД: Redis (redis/go-redis)
 - База данных: PostgreSQL (pgx)
-- Инфраструктура: Docker, Docker Compose
-
 ## Что было реализовано в рамках MVP
 
 ### Архитектура
@@ -35,4 +33,3 @@ PulseGuard — это высоконагруженный асинхронный 
 
 ### 3. Инфраструктура
 - Написаны SQL-миграции для PostgreSQL.
-- Подготовлена конфигурация Docker Compose для поднятия локального окружения (Kafka, PostgreSQL, Redis, Prometheus).
