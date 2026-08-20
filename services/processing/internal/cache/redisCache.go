@@ -7,6 +7,7 @@ import (
 	"pulseguard/services/pkg/buffers"
 	"pulseguard/services/pkg/logger"
 	"pulseguard/services/processing/internal/config"
+	"strings"
 	"sync"
 	"time"
 
@@ -111,7 +112,7 @@ func (rc *RedisCache) CheckIssues(ctx context.Context, fps []uint64) (map[uint64
 	return hits, missed, nil
 }
 
-func (rc *RedisCache) SaveTemp(ctx context.Context, fprints []uint64) ([]uint64, []uint64, error) {
+func (rc *RedisCache) SaveTempValues(ctx context.Context, fprints ...uint64) ([]uint64, []uint64, error) {
 	if len(fprints) == 0 {
 		return nil, nil, fmt.Errorf("got empty fingerprints slice")
 	}
@@ -155,9 +156,9 @@ func (rc *RedisCache) SaveTemp(ctx context.Context, fprints []uint64) ([]uint64,
 	return setted, skipped, nil
 }
 
-func (rc *RedisCache) SaveNew(ctx context.Context, values map[uint64]uuid.UUID) error {
+func (rc *RedisCache) SaveNewIssues(ctx context.Context, values map[uint64]uuid.UUID) error {
 	if len(values) == 0 {
-		return nil
+		return fmt.Errorf("got empty issues map")
 	}
 
 	buffer := rc.bufferPool.Get().(buffers.NumBuffer)
@@ -184,4 +185,92 @@ func (rc *RedisCache) SaveNew(ctx context.Context, values map[uint64]uuid.UUID) 
 	}
 
 	return nil
+}
+
+func (rc *RedisCache) IncrementIssues(ctx context.Context, issues map[uuid.UUID]int) (map[uuid.UUID]int64, error) {
+	if len(issues) == 0 {
+		return nil, fmt.Errorf("got empty issues map")
+	}
+
+	pipe := rc.redis.Pipeline()
+	cmds := make([]*redis.IntCmd, 0, len(issues))
+	for key, count := range issues {
+		cmds = append(cmds, pipe.IncrBy(ctx, key.String(), int64(count)))
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			rc.log.Error("context canceled during redis pipeline exec", "err", err)
+			return nil, err
+		}
+		rc.log.Error("unknown redis error during pipeline exec", "err", err)
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]int64, len(cmds))
+	for _, cmd := range cmds {
+		res, err := cmd.Result()
+		args := cmd.Args()
+		var key string
+		if len(args) > 0 {
+			key = args[1].(string)
+		}
+		if err != nil {
+			rc.log.Error("uanble to increment issue count with error", "key", key, "err", err)
+			return nil, err
+		}
+		strUU, err := uuid.Parse(key)
+		if err != nil {
+			rc.log.Error("unable to parse issue incr key", "err", err)
+		}
+		result[strUU] = res
+	}
+
+	return result, nil
+}
+
+func (rc *RedisCache) LockAllert(ctx context.Context, uuids ...uuid.UUID) ([]uuid.UUID, error) {
+	if len(uuids) == 0 {
+		return nil, fmt.Errorf("got empty uuids slice")
+	}
+
+	pipe := rc.redis.Pipeline()
+
+	cmds := make([]*redis.BoolCmd, len(uuids))
+	var sb strings.Builder
+	sb.Grow(41)
+	for i, v := range uuids {
+		sb.Reset()
+
+		sb.WriteString("lock:")
+		sb.WriteString(v.String())
+
+		cmds[i] = pipe.SetNX(ctx, sb.String(), "temp", 3600*time.Second)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			rc.log.Error("context canceled during redis pipeline exec", "err", err)
+			return nil, err
+		}
+		rc.log.Error("unknown redis error during pipeline exec", "err", err)
+		return nil, err
+	}
+
+	setted := make([]uuid.UUID, 0, len(uuids))
+	for i, v := range cmds {
+		success, err := v.Result()
+		if err != nil {
+			rc.log.Error("unable to set temp value on uuid with error", "err", err, "uuid", uuids[i])
+			continue
+		}
+
+		if success {
+			setted = append(setted, uuids[i])
+		}
+	}
+
+	return setted, nil
 }

@@ -22,7 +22,7 @@ type ErrorEvent struct {
 	Id         int64
 	IssueId    uuid.UUID
 	Level      uint8
-	Payload    string
+	Payload    []byte
 	TimeStamp  time.Time
 	ReceivedAt time.Time
 }
@@ -54,13 +54,15 @@ func parseLevel(level string) uint8 {
 	}
 }
 
-func parsePayload(ee contracts.ErrorEvent) string {
+func parsePayload(ee contracts.ErrorEvent) []byte {
 	if len(ee.StackTrace) == 0 {
-		return "{\n\"unknown\"\n}"
+		return []byte("{\n\"unknown\"\n}")
 	}
+
 	js, err := json.Marshal(ee.StackTrace)
 	if err != nil {
-		return "{\n\"unknown\"\n}"
+		return []byte("{\n\"unknown\"\n}")
 	}
-	return string(js)
+
+	return js
 }
